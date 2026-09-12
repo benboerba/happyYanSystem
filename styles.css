@@ -3688,3 +3688,50 @@ select,textarea,input[type="text"],input[type="number"],input[type="url"],input[
   .teaching-layer .courseware-tips { overflow:visible; }
   .player-item > button[data-courseware] { grid-column:2 / -1; justify-self:start; }
 }
+/* Task-first navigation and daily home. */
+.side-nav button { display:block; text-align:left; padding:18px 20px; font-size:18px; }
+.sidebar-help { margin-top:auto; text-align:left; line-height:1.6; }
+.today-focus { padding:32px; border:1px solid #e6defa; border-radius:24px; background:linear-gradient(120deg,#f0eaff,#f0fcf7); }
+.today-focus h2 { margin:12px 0; font-size:clamp(28px,3.5vw,44px); line-height:1.2; }
+.today-description { max-width:680px; font-size:16px; line-height:1.8; color:var(--ink-soft); }
+.today-main-action { margin:24px 0 16px; }
+.today-main-action .primary-button { min-height:52px; padding:16px 26px; }
+.today-step { font-size:13px; color:var(--ink-soft); margin:0; }
+.today-course-list { margin-top:30px; }
+.today-course-list .section-heading { align-items:center; }
+.today-course-list h3 { margin:0; font-size:22px; }
+.today-course-list > p { font-size:13px; color:var(--ink-soft); }
+.today-courses { display:grid; gap:12px; }
+.today-course { display:flex; align-items:center; gap:18px; width:100%; border:1px solid var(--line); border-radius:18px; padding:14px; text-align:left; background:white; cursor:pointer; }
+.today-course img,.course-play { width:100px; height:70px; border-radius:12px; object-fit:cover; background:#eee7ff; flex:none; }
+.course-play { display:grid; place-items:center; color:#7653df; }
+.today-course > span:not(.course-play) { flex:1; min-width:0; }
+.today-course strong { display:block; font-size:18px; overflow-wrap:anywhere; }
+.today-course small { display:block; margin-top:7px; color:var(--ink-soft); }
+.today-course b { color:#6544ce; font-size:14px; }
+.today-secondary { display:flex; align-items:flex-start; gap:24px; justify-content:space-between; padding:24px 0; }
+.today-secondary details { flex:1; line-height:1.7; }
+.today-secondary summary { cursor:pointer; font-size:14px; color:var(--ink-soft); }
+.today-secondary p { margin-top:12px; font-size:14px; }
+.records-home,.usage-guide { padding:28px; border:1px solid var(--line); border-radius:20px; background:white; }
+.records-home .training-log { margin-top:28px; }
+.usage-guide { max-width:900px; line-height:1.8; }
+.usage-guide li { margin:20px 0; }
+.view-tabs,.more-tabs { flex-wrap:wrap; gap:8px; }
+.more-tabs button,.view-tabs button { white-space:normal; }
+.today-aside { margin-bottom:24px; }
+@media(max-width:1100px) { .mobile-nav { grid-template-columns:repeat(4,minmax(0,1fr)); } .mobile-nav button { font-size:12px; padding:14px 2px; } }
+@media(max-width:600px) {
+  .today-focus { padding:22px 18px; }
+  .today-main-action .primary-button { width:100%; justify-content:center; }
+  .today-course { flex-wrap:wrap; gap:12px; }
+  .today-course img,.course-play { width:72px; height:58px; }
+  .today-course b { width:100%; text-align:right; }
+  .today-secondary { flex-direction:column; gap:12px; }
+  .today-step { line-height:1.7; }
+  .records-home,.usage-guide { padding:20px 16px; }
+  .topbar { align-items:center; gap:12px; }
+  .topbar h1 { font-size:26px; }
+}
+
+@media(max-width:1100px) { .toast { bottom:calc(86px + env(safe-area-inset-bottom)); } }

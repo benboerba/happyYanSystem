@@ -38,7 +38,8 @@ const initialState = {
   pauseReason: "",
   activeView: "today",
   pathTab: "stages",
-  moreTab: "learn",
+  moreTab: "guide",
+  reviewTab: "history",
   selectedStageId: "protect",
   selectedCourseWeek: 1,
   libraryFilter: "all",
@@ -84,6 +85,23 @@ function clearTrainingDataOnce() {
 clearTrainingDataOnce();
 let state = loadState();
 let sessionDraft = null;
+try {
+  const saved = JSON.parse(sessionStorage.getItem("fuji_session_draft") || "null");
+  if (saved?.date === todayKey() && saved.draft?.stageId === state.currentStageId && Array.isArray(saved.draft.items) && Array.isArray(saved.draft.checked) && !state.trainingPaused && !hasSafetyBlock(state)) sessionDraft = saved.draft;
+} catch {}
+const formDrafts = {};
+function persistSessionDraft() {
+  try { sessionStorage.setItem("fuji_session_draft", JSON.stringify({ date: todayKey(), draft: sessionDraft })); } catch {}
+}
+function restoreFormDrafts(container = document) {
+  container.querySelectorAll("#checkinForm input, #checkinForm textarea, .session-modal input").forEach(input => {
+    const key = input.id || `${input.name}:${input.value}`;
+    if (!(key in formDrafts)) return;
+    if (["radio", "checkbox"].includes(input.type)) input.checked = formDrafts[key]; else input.value = formDrafts[key];
+  });
+  bindRangeLabels();
+}
+const coursewarePlayback = new Map();
 let pendingMediaFile = null;
 let pendingImport = null;
 let timerId = null;
@@ -191,7 +209,8 @@ function sanitizeState(candidate) {
     pauseReason: safetyBlocked ? (pauseReason || "存在尚未通过完整安全再筛的警讯，通用自主训练保持暂停。") : pauseReason,
     activeView: ["today", "path", "library", "review", "more"].includes(raw.activeView) ? raw.activeView : "today",
     pathTab: ["stages", "course"].includes(raw.pathTab) ? raw.pathTab : "stages",
-    moreTab: ["learn", "safety", "media", "data"].includes(raw.moreTab) ? raw.moreTab : "learn",
+    moreTab: ["guide", "learn", "safety", "media", "data", "course", "practice"].includes(raw.moreTab) ? raw.moreTab : "guide",
+    reviewTab: ["history", "reaction", "stages"].includes(raw.reviewTab) ? raw.reviewTab : "history",
     selectedStageId: stageExists(raw.selectedStageId) ? raw.selectedStageId : currentStageId,
     selectedCourseWeek: clamp(raw.selectedCourseWeek, 1, 16, 1),
     libraryFilter: typeof raw.libraryFilter === "string" ? raw.libraryFilter : "all",
@@ -277,6 +296,7 @@ function clearManagedState() {
 
 function updateState(patch, shouldRender = true) {
   state = sanitizeState({ ...state, ...patch });
+  if (sessionDraft && (sessionDraft.stageId !== state.currentStageId || state.trainingPaused || hasSafetyBlock(state))) { sessionDraft = null; persistSessionDraft(); }
   saveState();
   if (shouldRender) render();
 }
@@ -494,11 +514,11 @@ function renderWelcome() {
     <section class="welcome-grid">
       <div class="welcome-copy reveal">
         <p class="eyebrow">从你现在能承受的位置开始</p>
-        <h1>认真恢复，<br><em>不必假装坚强。</em></h1>
-        <p class="lead">这里没有真实手术。“虚拟手术”表示：给恢复留出时间，认真安排活动、训练与生活，从目前能承受的水平逐步回归。</p>
+        <h1>跟随课件练习，<br><em>记录身体变化。</em></h1>
+        <p class="lead">查看康复师发布的视频、动作图和要领，记录训练后的感受。首次使用，先完成安全筛查和活动评估。</p>
         <div class="principle-strip"><span>不卧床</span><span>不试痛</span><span>不按积分升级</span><span>允许退回</span></div>
         <div class="consent-sheet">
-          <label class="check-row"><input type="checkbox" id="consentUse" /><span><strong>我理解这不是诊断、真实术后医嘱或疗效保证</strong><small>这是 McGill 启发的教育性改编；阶段描述活动起点，不代表组织损伤或医学分期。</small></span></label>
+          <label class="check-row"><input type="checkbox" id="consentUse" /><span><strong>我理解这不是诊断、真实术后医嘱或疗效保证</strong><small>这里没有真实手术。这是 McGill 启发的教育性改编；阶段描述活动起点，不代表组织损伤或医学分期。</small></span></label>
           <label class="check-row"><input type="checkbox" id="consentData" /><span><strong>我同意在本机保存训练与症状记录</strong><small>无需账号，记录只保存在当前浏览器，可随时导出或清除。</small></span></label>
         </div>
         <button class="primary-button wide" data-action="accept-consent">开始安全筛查 <span>→</span></button>
@@ -628,33 +648,51 @@ function renderRecommendation() {
 }
 
 function renderShell() {
-  const nav = [["today", "今日", "01"], ["path", "路线", "02"], ["library", "动作", "03"], ["review", "复盘", "04"], ["more", "更多", "05"]];
+  const nav = [["today", "今日训练"], ["library", "跟练课件"], ["review", "我的记录"], ["more", "帮助与设置"]];
   const stage = currentStage();
   const decision = decisionMeta(state.lastDecision?.code);
   app.innerHTML = `
     <div class="product-shell">
       <aside class="sidebar">
         <a class="wordmark light" href="#" data-view="today"><span class="wordmark-mark">脊</span><span><strong>复脊</strong><small>腰背恢复教育</small></span></a>
-        <nav class="side-nav" aria-label="主导航">${nav.map(([id, label, number]) => `<button data-view="${id}" class="${state.activeView === id ? "active" : ""}"><span>${number}</span>${label}</button>`).join("")}</nav>
-        <div class="sidebar-status ${decision.tone}"><small>当前活动阶段</small><strong>${stage.name}</strong><span>${doseMeta().label} · ${decision.label}</span></div>
+        <nav class="side-nav" aria-label="主导航">${nav.map(([id, label, number]) => `<button data-view="${id}" class="${(state.activeView === "path" ? "review" : state.activeView) === id ? "active" : ""}">${label}</button>`).join("")}</nav>
+        <button class="sidebar-help text-button" data-view="more" data-more-tab="safety">身体不适，查看安全帮助 →</button>
         <p class="sidebar-disclaimer">教育与记录工具 · 非医学分期<br>出现警讯请及时就医</p>
       </aside>
       <main class="main-content">${renderTopbar()}<div class="view-container">${renderActiveView()}</div></main>
-      <nav class="mobile-nav" aria-label="移动端主导航">${nav.map(([id, label, number]) => `<button data-view="${id}" class="${state.activeView === id ? "active" : ""}"><span>${number}</span>${label}</button>`).join("")}</nav>
+      <nav class="mobile-nav" aria-label="移动端主导航">${nav.map(([id, label, number]) => `<button data-view="${id}" class="${(state.activeView === "path" ? "review" : state.activeView) === id ? "active" : ""}">${label}</button>`).join("")}</nav>
     </div>`;
-  bindRangeLabels();
+  restoreFormDrafts();
 }
 
 function renderTopbar() {
-  const titles = { today: "今天", path: "恢复路线", library: "动作教学", review: "反应复盘", more: "知识与设置" };
-  return `<header class="topbar"><div><p>${dateLabel()}</p><h1>${titles[state.activeView]}</h1></div><div class="topbar-meta"><span>目标 · ${goalName()}</span><strong>S${currentStage().order}</strong></div></header>`;
+  const titles = { today: "今日训练", path: "当前阶段与调整说明", library: "跟练课件", review: "我的记录", more: "帮助与设置" };
+  return `<header class="topbar"><div><p>${dateLabel()}</p><h1>${titles[state.activeView]}</h1></div><button class="text-button" data-view="more" data-more-tab="safety">安全帮助</button></header>`;
 }
 
 function renderActiveView() {
-  return { today: renderToday, path: renderPath, library: renderLibrary, review: renderReview, more: renderMore }[state.activeView]();
+  return { today: renderToday, path: renderRecords, library: renderLibrary, review: renderRecords, more: renderMore }[state.activeView]();
 }
 
 function renderToday() {
+  const plan = publishedPlanFor();
+  const pending = pendingReviewSession();
+  const paused = state.trainingPaused || hasSafetyBlock(state);
+  const continuing = !paused && Boolean(sessionDraft);
+  const finished = hasTodaySession();
+  let title = "今天，从一次跟练开始";
+  let description = plan.length ? `康复师已发布 ${plan.length} 个跟练动作。开始前先确认身体情况，结束后记录感受。` : "康复师尚未发布跟练课件。发布后会自动显示在这里，无需反复设置。";
+  let button = plan.length ? '<button class="primary-button start-session" data-action="start-session">开始今日训练 →</button>' : '<button class="primary-button" data-view="more" data-more-tab="guide">查看使用说明 →</button>';
+  if (finished) { title = "今日训练已记录"; description = "今天的训练和即时反应已经保存。明天回来，补充睡眠、晨起和日常活动的变化。"; button = '<button class="primary-button" data-view="review" data-review-tab="history">查看训练记录 →</button>'; }
+  if (pending) { title = "先记录上次训练后的感受"; description = `${pending.date} 的训练还有一份反应待补充，用来安排接下来的训练。`; button = '<button class="primary-button" data-view="review" data-review-tab="reaction">记录训练后反应 →</button>'; }
+  if (continuing) { title = "继续刚才的训练"; description = `已标记完成 ${sessionDraft.checked?.length || 0} 个动作，进度已保留。`; button = '<button class="primary-button" data-action="resume-session">继续训练 →</button>'; }
+  if (paused) { title = "当前训练已暂停"; description = state.pauseReason || "请先查看安全说明，再决定下一步。"; button = '<button class="primary-button" data-view="more" data-more-tab="safety">查看处理建议 →</button>'; }
+  return `<section class="today-focus"><p class="eyebrow">看课件跟练 · 记录身体反应</p><h2>${title}</h2><p class="today-description">${escapeHTML(description)}</p><div class="today-main-action">${button}</div><p class="today-step">确认身体情况 → 跟随课件练习 → 结束并记录</p></section>
+    ${!paused && plan.length ? `<section class="today-course-list"><div class="section-heading"><h3>今天可跟练的课件</h3><button class="text-button" data-view="library">全部课件 →</button></div><p>按康复师的专业建议选择；打开课件不会标记完成。</p><div class="today-courses">${plan.map(entry => {const item = publishedCoursewareById[entry.id]; return `<button class="today-course" data-courseware="${entry.id}">${item.imageUrls?.[0] ? `<img src="${escapeHTML(contentPath(item.imageUrls[0]))}" alt="" loading="lazy">` : '<span class="course-play">▶</span>'}<span><strong>${escapeHTML(item.actionName)}</strong><small>${categoryLabels[item.category]} · 视频 / 图片 / 要领</small></span><b>查看课件 →</b></button>`;}).join("")}</div></section>` : ""}
+    <section class="today-secondary"><details><summary>当前安排：${currentStage().name} · ${doseMeta().label}</summary><p>${doseMeta().note}</p><p>${currentStage().purpose}</p><button class="text-button" data-view="review" data-review-tab="stages">查看阶段与调整说明 →</button></details><button class="text-button" data-view="review" data-review-tab="history">查看我的记录 →</button></section>`;
+}
+
+function renderDailyPractice() {
   const stage = currentStage();
   const meta = doseMeta();
   const plan = publishedPlanFor();
@@ -667,29 +705,11 @@ function renderToday() {
   const badges = earnedBadges();
   const pendingReview = pendingReviewSession();
   const waitingForTomorrow = !pendingReview && hasTodaySession();
-  return `
-    ${state.trainingPaused ? renderPauseBanner() : ""}
-    <section class="stage-hero reveal">
-      <div class="stage-code"><span>活动起点</span><strong>0${stage.order}</strong><small>不是损伤等级</small></div>
-      <div class="stage-headline"><p class="eyebrow">${stage.label} · ${stage.courseWeeks}</p><h2>${stage.name}</h2><p>${stage.purpose}</p></div>
-      <div class="dose-ticket ${meta.tone}"><small>今天使用</small><strong>${meta.label}</strong><p>${meta.note}</p></div>
-    </section>
-    ${pendingReview ? `<button class="nextday-banner due" data-view="review"><span>${pendingReview.date} 的训练待复盘</span><strong>记录睡眠、晨起和日常活动反应 →</strong></button>` : waitingForTomorrow ? `<div class="nextday-banner waiting"><span>今天的训练正在等待延迟反应</span><strong>明天再记录睡眠、晨起和日常活动变化</strong></div>` : ""}
-    <section class="dashboard-grid home-grid">
-      <article class="training-sheet reveal delay">
-        <div class="section-heading"><div><p class="eyebrow">今日主训练</p><h3>${stage.minutes[state.doseMode]}</h3></div><span class="duration">${plan.length} 个项目</span></div>
-        <p class="plan-why">${plan.length ? "以下为康复师已发布的跟练课件，请按专业建议选择。" : "康复师尚未发布跟练课件。"}</p>
-        ${plan.length ? `<ol class="exercise-list">${plan.map((entry, index) => renderPlanItem(entry, index)).join("")}</ol>` : `<div class="courseware-empty"><span>CONTENT PENDING</span><strong>跟练内容待发布</strong><p>康复师发布视频、动作拆解图和注意要领后，会在这里自动生效。</p></div>`}
-        ${state.trainingPaused ? `<button class="primary-button wide" data-view="more" data-more-tab="safety">训练已暂停，查看安全路径 <span>→</span></button>` : plan.length ? `<button class="primary-button wide start-session" data-action="start-session">开始今天的跟练 <span>→</span></button>` : ""}
-        <p class="heuristic-inline">组次、分值和连续天数是用于安排练习的产品启发式，未经临床验证，不构成医疗许可。</p>
-      </article>
-      <aside class="today-aside reveal delay-two">
+  return `      <aside class="today-aside reveal delay-two">
         <article class="micro-card ${microDone ? "done" : ""}"><p class="eyebrow">今日微任务</p><h3>${microTask}</h3><p>完成或不完成都不会扣分；只记录真实生活中的一次尝试。</p><button class="text-button" data-action="toggle-micro">${microDone ? "已记录，点此撤销" : "记录这次尝试 →"}</button></article>
         <article class="return-card"><p class="eyebrow">温和回访</p><div><strong>${returns}</strong><span>个不同日期<br>回来照顾过自己</span></div><p>${returns === 0 ? "第一次回来就已经是开始。" : returns < 4 ? "中断不会清零，下次回来从合适剂量继续。" : "你在练习诚实反馈，而不是刷完成率。"}</p></article>
         <article class="badge-card"><p class="eyebrow">自我管理徽章 · 不解锁阶段</p><div>${["会调整", "如实记录", "再次出发"].map((name) => `<span class="${badges[name] ? "earned" : ""}"><i>${badges[name] ? "✓" : "○"}</i><strong>${name}</strong></span>`).join("")}</div><p>它们只肯定调整、诚实记录与重新开始，不评价疼痛，也不计算分数。</p></article>
-      </aside>
-    </section>
-    <section class="scenario-card reveal">
+      </aside>    <section class="scenario-card reveal">
       <div class="scenario-story"><p class="eyebrow">情景选择 · 不计分</p><h3>${scenario.title}</h3><p>${scenario.context}</p></div>
       <div class="scenario-options">${scenario.options.map((option, index) => `<button data-scenario="${scenario.id}" data-choice="${index}" ${scenarioResult?.correct ? "disabled" : ""} class="${scenarioResult && Number(scenarioResult.choice) === index ? "chosen" : ""}"><span>${String.fromCharCode(65 + index)}</span>${option}</button>`).join("")}</div>
       ${scenarioResult ? `<div class="scenario-feedback ${scenarioResult.correct ? "correct" : "gentle"}"><strong>${scenarioResult.correct ? `已获得“${scenario.badge}”练习标记` : "这里不扣分，可以重新选择"}</strong><p>${scenarioResult.correct ? scenario.feedback : scenario.retry}</p></div>` : ""}
@@ -771,7 +791,7 @@ function renderReview() {
   const pendingReview = pendingReviewSession();
   const sameDayWaiting = !pendingReview && hasTodaySession();
   return `
-    <section class="review-intro reveal"><div><p class="eyebrow">延迟反应决定下一步</p><h2>今天少做一点，<br>也可以是正确决策。</h2></div><p>复盘不会诊断病因。它只根据你报告的症状走向、动作质量和次日反应，调整应用里的计划剂量。</p></section>
+    <section class="review-intro reveal"><div><p class="eyebrow">延迟反应决定下一步</p><h2>记录训练后的身体反应</h2></div><p>复盘不会诊断病因。它只根据你报告的症状走向、动作质量和次日反应，调整应用里的计划剂量。</p></section>
     <section class="review-layout">
       <form class="checkin-form reveal" id="checkinForm">
         <div class="section-heading"><div><p class="eyebrow">${pendingReview ? `${pendingReview.date} 训练的次日复盘` : "今日状态记录"}</p><h3>身体给了什么反馈？</h3></div><span class="duration">约 1 分钟</span></div>
@@ -784,7 +804,7 @@ function renderReview() {
         ${compactRadio("今天总负荷", "capacity", [["low", "偏轻"], ["normal", "正常"], ["high", "久坐、搬运或睡眠差"]], "normal")}
         <label class="range-field dark-output"><span><strong>对当前活动的信心</strong><output data-output="confidence">7</output></span><input type="range" id="confidence" min="0" max="10" value="7" /><small><span>0 很担心</span><span>10 很有把握</span></small></label>
         <label class="note-field"><span>备注（选填）</span><textarea id="checkinNote" maxlength="240" placeholder="例如：昨晚睡眠差，今天主动把携行减到两组"></textarea></label>
-        <button class="primary-button wide" type="submit">调整应用内计划 <span>→</span></button>
+        <button class="primary-button wide" type="submit">保存反应记录 <span>→</span></button>
       </form>
       <aside class="review-summary reveal delay">
         <article class="decision-card ${decision.tone}"><p class="eyebrow">最近一次反馈</p><h3>${decision.label}</h3><p>${state.lastDecision?.summary || "完成训练并在次日记录，应用才会调整剂量。"}</p><div class="dose-change"><span>当前实际剂量</span><strong>${doseMeta().label}</strong></div>${state.lastDecision?.code === "orange" ? `<button class="secondary-button" data-action="retreat-stage">退回上一稳定阶段</button>` : ""}${state.lastDecision?.code === "red" ? `<button class="secondary-button" data-view="more" data-more-tab="safety">查看就医路径</button>` : ""}</article>
@@ -804,10 +824,20 @@ function renderHistory() {
   return `<div class="training-log">${items.map((item) => `<div><span>${item.type}</span><p><strong>${escapeHTML(item.title || "记录")}</strong><small>${escapeHTML(item.detail || "")}</small></p><time>${String(item.date).slice(5)}</time></div>`).join("")}</div>`;
 }
 
+function renderRecords() {
+  const tab = state.activeView === "path" ? "stages" : state.reviewTab;
+  return `<div class="view-tabs">${[["history","训练记录"],["reaction","训练后反应"],["stages","当前阶段与调整说明"]].map(([id,label])=>`<button data-review-tab="${id}" class="${tab===id?"active":""}">${label}</button>`).join("")}</div>${tab === "stages" ? renderStagePath() : tab === "reaction" ? renderReview() : `<section class="records-home"><h2>每一次训练，都有记录</h2><p>查看练过的动作和训练后的身体反应。</p>${pendingReviewSession() ? '<button class="primary-button" data-review-tab="reaction">补充上次训练后的感受 →</button>' : '<button class="secondary-button" data-review-tab="reaction">记录今天的身体状态</button>'}${renderHistory()}</section>`}`;
+}
+
 function renderMore() {
-  const activeTab = state.moreTab === "media" ? "learn" : state.moreTab;
-  const tabs = [["learn", "知识"], ["safety", "安全"], ["data", "数据"]];
-  return `<div class="more-tabs">${tabs.map(([id, label]) => `<button data-more-tab="${id}" class="${activeTab === id ? "active" : ""}">${label}</button>`).join("")}</div>${activeTab === "learn" ? renderKnowledge() : activeTab === "safety" ? renderSafetyHub() : renderDataHub()}`;
+  const activeTab = state.moreTab === "media" ? "guide" : state.moreTab;
+  const tabs = [["guide", "使用说明"], ["learn", "恢复知识"], ["course", "16周参考课程"], ["practice", "日常练习"], ["safety", "安全帮助"], ["data", "数据与设置"]];
+  const content = { guide: renderUsageGuide, learn: renderKnowledge, course: renderCourseReference, practice: renderDailyPractice, safety: renderSafetyHub, data: renderDataHub };
+  return `<div class="more-tabs">${tabs.map(([id, label]) => `<button data-more-tab="${id}" class="${activeTab === id ? "active" : ""}">${label}</button>`).join("")}</div>${content[activeTab]()}`;
+}
+
+function renderUsageGuide() {
+  return `<section class="usage-guide"><h2>看课件跟练，记录身体变化</h2><p>复脊帮助你查看康复师发布的课件，并保存自己的训练和身体反应。</p><ol><li><strong>打开今日训练</strong><p>查看今天的下一步；开始前确认身体情况。</p></li><li><strong>跟随课件练习</strong><p>查看视频、动作图和要领。完成后单独勾选，也可以随时停止。</p></li><li><strong>结束并记录</strong><p>保存训练后的感受，第二天回来补充变化。记录可在“我的记录”中查看。</p></li></ol><button class="secondary-button" data-view="today">返回今日训练 →</button><p>本工具用于教育与记录，不提供诊断；出现警讯请及时寻求医疗帮助。</p></section>`;
 }
 
 function renderKnowledge() {
@@ -866,13 +896,18 @@ async function openExerciseModal(id) {
   const tips = String(courseware.tips || "").split("\n").map((line) => line.replace(/^[\s•·\-*\d.]+/, "").trim()).filter(Boolean);
   const mediaHTML = courseware.videoUrl ? MediaStore.renderVideo(contentPath(courseware.videoUrl), `${courseware.actionName}跟练视频`) : `<div class="courseware-missing">康复师未上传视频</div>`;
   insertModal(`
-    <section class="modal-sheet courseware-modal" role="dialog" aria-modal="true" aria-labelledby="exerciseTitle"><button class="modal-close courseware-back" data-action="close-teaching">← ${preserveSession ? "返回跟练" : "返回动作"}</button>
+    <section data-courseware-id="${id}" class="modal-sheet courseware-modal" role="dialog" aria-modal="true" aria-labelledby="exerciseTitle"><button class="modal-close courseware-back" data-action="close-teaching">← ${preserveSession ? "返回跟练" : "返回动作"}</button>
       <header><p class="eyebrow">${categoryLabels[courseware.category]} · 康复师跟练课件</p><h2 id="exerciseTitle">${escapeHTML(courseware.actionName)}</h2></header>
       <section><div class="courseware-title"><b>01</b><h3>跟练视频</h3></div><div class="teaching-media">${mediaHTML}</div></section>
       <section><div class="courseware-title"><b>02</b><h3>跟练动作拆解（图片）</h3></div><div class="courseware-images">${courseware.imageUrls?.length ? courseware.imageUrls.map((url, index) => `<figure><img src="${escapeHTML(contentPath(url))}" alt="${escapeHTML(courseware.actionName)}动作拆解 ${index + 1}" loading="lazy"><figcaption>${String(index + 1).padStart(2, "0")}</figcaption></figure>`).join("") : `<div class="courseware-missing">康复师未上传动作拆解图</div>`}</div></section>
       <section><div class="courseware-title"><b>03</b><h3>注意要领（文字）</h3></div><div class="courseware-tips">${tips.length ? `<ol>${tips.map((tip) => `<li>${escapeHTML(tip)}</li>`).join("")}</ol>` : `<p>康复师未填写注意要领。</p>`}</div></section>
       <p class="modal-safety">若动作引起新的腿部放射、麻木、无力或其他警讯，请立即停止并按安全路径处理。</p>
     </section>`, "teaching-layer", { replace: false });
+  const video = document.querySelector(".teaching-layer video");
+  if (video) {
+    video.addEventListener("loadedmetadata", () => { video.currentTime = Math.min(coursewarePlayback.get(id) || 0, video.duration || 0); }, { once: true });
+    video.addEventListener("timeupdate", () => coursewarePlayback.set(id, video.currentTime));
+  }
 }
 
 function insertModal(content, className = "", options = {}) {
@@ -890,7 +925,7 @@ function insertModal(content, className = "", options = {}) {
     modal.__objectUrls = objectUrls;
     modal.__previousFocus = previousFocus;
   }
-  bindRangeLabels();
+  restoreFormDrafts(modal);
   focusableElements(modal)[0]?.focus();
 }
 
@@ -939,6 +974,7 @@ function closeTopModal() {
     next.inert = false;
   }
   if (restoreFocus?.isConnected) restoreFocus.focus();
+  if (!document.querySelector(".modal-backdrop") && sessionDraft) render();
 }
 
 function closeModal() {
@@ -950,6 +986,7 @@ function closeModal() {
     node.remove();
   });
   if (restoreFocus?.isConnected) restoreFocus.focus();
+  if (!document.querySelector(".modal-backdrop") && sessionDraft) render();
 }
 
 function openStageGate() {
@@ -960,21 +997,23 @@ function openStageGate() {
 }
 
 function openPrecheck() {
-  insertModal(`<section class="modal-sheet session-modal" role="dialog" aria-modal="true"><button class="modal-close" data-action="close-modal" aria-label="关闭">×</button><p class="eyebrow">训练前 · 30 秒</p><h2>今天需要哪一档剂量？</h2><label class="range-field dark-output"><span><strong>训练前不适</strong><output data-output="prePain">${state.assessment.pain}</output></span><input type="range" id="prePain" min="0" max="10" value="${state.assessment.pain}" /><small><span>0</span><span>10</span></small></label><label class="alert-check"><input type="checkbox" id="newWarning" /><span><strong>今天有新的麻木、无力、排尿排便改变、会阴感觉改变或症状快速恶化</strong><small>勾选后立即停止，不进入动作列表。</small></span></label>${compactRadio("今天的容量", "preCapacity", [["fresh", "状态正常"], ["loaded", "久坐／家务较多"], ["poor", "睡眠差或明显疲劳"]], "fresh")}<button class="primary-button wide" data-action="confirm-precheck">生成今日实际剂量 <span>→</span></button></section>`);
+  insertModal(`<section class="modal-sheet session-modal" role="dialog" aria-modal="true"><button class="modal-close" data-action="close-modal" aria-label="关闭">×</button><p class="eyebrow">训练前 · 30 秒</p><h2>开始前，确认今天的身体情况</h2><label class="range-field dark-output"><span><strong>训练前不适</strong><output data-output="prePain">${state.assessment.pain}</output></span><input type="range" id="prePain" min="0" max="10" value="${state.assessment.pain}" /><small><span>0</span><span>10</span></small></label><label class="alert-check"><input type="checkbox" id="newWarning" /><span><strong>今天有新的麻木、无力、排尿排便改变、会阴感觉改变或症状快速恶化</strong><small>勾选后立即停止，不进入动作列表。</small></span></label>${compactRadio("今天的容量", "preCapacity", [["fresh", "状态正常"], ["loaded", "久坐／家务较多"], ["poor", "睡眠差或明显疲劳"]], "fresh")}<button class="primary-button wide" data-action="confirm-precheck">确认并开始跟练 <span>→</span></button></section>`);
 }
 
 function openSessionPlayer() {
   const stage = currentStage();
-  const items = publishedPlanFor();
+  const items = (sessionDraft.items || publishedPlanFor()).filter(entry => publishedCoursewareById[entry.id]);
   sessionDraft.items = items;
-  insertModal(`<section class="session-player" role="dialog" aria-modal="true"><header><button class="text-button light-text" data-action="close-modal">结束跟练</button><span>${stage.name} · ${doseMeta(sessionDraft.doseMode).label}</span><strong id="sessionProgress">0/${items.length}</strong></header><div class="player-intro"><p class="eyebrow">动作质量优先 · 可以提前停止</p><h2>跟随康复师发布的课件完成。</h2></div><div class="player-list">${items.map((entry, index) => { const item = publishedCoursewareById[entry.id]; const firstTip = String(item.tips || "").split("\n").find(Boolean) || "请先打开课件查看注意要领。"; return `<label class="player-item"><input type="checkbox" data-player-check="${index}" /><span class="player-number">${String(index + 1).padStart(2, "0")}</span><span><small>${categoryLabels[item.category]}</small><strong>${escapeHTML(item.actionName)}</strong><em>${entry.dose}</em><p>${escapeHTML(firstTip)}</p></span><button type="button" data-courseware="${entry.id}">▶ 查看视频 / 图片</button></label>`; }).join("")}</div><footer><p>停止得及时，也是一条有价值的训练记录。</p><button class="primary-button" data-action="finish-session">结束并记录反应 →</button></footer></section>`, "session-full");
+  sessionDraft.checked ||= [];
+  persistSessionDraft();
+  insertModal(`<section class="session-player" role="dialog" aria-modal="true"><header><button class="text-button light-text" data-action="pause-session">暂时离开</button><span>${stage.name} · ${doseMeta(sessionDraft.doseMode).label}</span><strong id="sessionProgress">${sessionDraft.checked.length}/${items.length}</strong></header><div class="player-intro"><p class="eyebrow">动作质量优先 · 可以提前停止</p><h2>跟随康复师发布的课件完成。</h2></div><div class="player-list">${items.map((entry, index) => { const item = publishedCoursewareById[entry.id]; const firstTip = String(item.tips || "").split("\n").find(Boolean) || "请先打开课件查看注意要领。"; return `<div class="player-item ${sessionDraft.checked.includes(index) ? "done" : ""}"><input type="checkbox" aria-label="标记${escapeHTML(item.actionName)}完成" data-player-check="${index}" ${sessionDraft.checked.includes(index) ? "checked" : ""} /><span class="player-number">${String(index + 1).padStart(2, "0")}</span><span><small>${categoryLabels[item.category]}</small><strong>${escapeHTML(item.actionName)}</strong><em>${entry.dose}</em><p>${escapeHTML(firstTip)}</p></span><button type="button" data-courseware="${entry.id}">▶ 查看视频 / 图片</button></div>`; }).join("")}</div><footer><p>停止得及时，也是一条有价值的训练记录。</p><button class="primary-button" data-action="finish-session">结束并记录反应 →</button></footer></section>`, "session-full");
 }
 
 function openPostcheck() {
   const checks = [...document.querySelectorAll("[data-player-check]")];
   sessionDraft.completedCount = checks.filter((item) => item.checked).length;
   sessionDraft.totalCount = checks.length;
-  insertModal(`<section class="modal-sheet session-modal" role="dialog" aria-modal="true"><p class="eyebrow">训练后 · 即时反应</p><h2>这次剂量带来了什么？</h2><label class="range-field dark-output"><span><strong>训练后不适</strong><output data-output="postPain">${sessionDraft.painBefore}</output></span><input type="range" id="postPain" min="0" max="10" value="${sessionDraft.painBefore}" /><small><span>0</span><span>10</span></small></label>${compactRadio("动作质量", "postQuality", [["good", "完成部分都稳定"], ["mixed", "后段开始变形"], ["poor", "明显失控或屏气"]], "good")}${compactRadio("腿部或神经症状", "postRadiation", [["none", "没有或稳定"], ["closer", "更靠近腰背"], ["farther", "向小腿／足扩散"], ["weak", "新发麻木或无力"]], "none")}${compactRadio("为什么结束", "finishReason", [["planned", "完成计划"], ["quality", "质量下降，主动停止"], ["symptom", "症状变化，主动停止"], ["choice", "今天选择少做"]], sessionDraft.completedCount === sessionDraft.totalCount ? "planned" : "choice")}<button class="primary-button wide" data-action="save-session">保存这次真实记录 <span>→</span></button></section>`);
+  insertModal(`<section class="modal-sheet session-modal" role="dialog" aria-modal="true"><p class="eyebrow">训练后 · 即时反应</p><h2>训练结束后，感觉怎么样？</h2><label class="range-field dark-output"><span><strong>训练后不适</strong><output data-output="postPain">${sessionDraft.painBefore}</output></span><input type="range" id="postPain" min="0" max="10" value="${sessionDraft.painBefore}" /><small><span>0</span><span>10</span></small></label>${compactRadio("动作质量", "postQuality", [["good", "完成部分都稳定"], ["mixed", "后段开始变形"], ["poor", "明显失控或屏气"]], "good")}${compactRadio("腿部或神经症状", "postRadiation", [["none", "没有或稳定"], ["closer", "更靠近腰背"], ["farther", "向小腿／足扩散"], ["weak", "新发麻木或无力"]], "none")}${compactRadio("为什么结束", "finishReason", [["planned", "完成计划"], ["quality", "质量下降，主动停止"], ["symptom", "症状变化，主动停止"], ["choice", "今天选择少做"]], sessionDraft.completedCount === sessionDraft.totalCount ? "planned" : "choice")}<button class="primary-button wide" data-action="save-session">保存并返回首页 <span>→</span></button></section>`);
 }
 
 function startTimer(seconds, button) {
@@ -1126,7 +1165,9 @@ function saveSession() {
   }
   closeModal();
   sessionDraft = null;
-  updateState({ sessions: [record, ...state.sessions].slice(0, 365), doseMode, trainingPaused, pauseReason, lastDecision, stableStreak, safetyStatus, safetyFlags });
+  persistSessionDraft();
+  Object.keys(formDrafts).forEach(key => delete formDrafts[key]);
+  updateState({ activeView: "today", sessions: [record, ...state.sessions].slice(0, 365), doseMode, trainingPaused, pauseReason, lastDecision, stableStreak, safetyStatus, safetyFlags });
   toast(finishReason === "planned" ? "训练已保存。请在次日补充延迟反应。" : "主动停止已记录，不会清零任何进度。", "success");
 }
 
@@ -1226,6 +1267,7 @@ document.addEventListener("click", async (event) => {
     event.preventDefault();
     const patch = { activeView: viewButton.dataset.view };
     if (viewButton.dataset.moreTab) patch.moreTab = viewButton.dataset.moreTab;
+    if (viewButton.dataset.reviewTab) patch.reviewTab = viewButton.dataset.reviewTab;
     updateState(patch);
     return;
   }
@@ -1237,7 +1279,7 @@ document.addEventListener("click", async (event) => {
   }
   if (event.target.closest("[data-exercise]") && !event.target.closest("[data-timer]")) {
     const id = event.target.closest("[data-exercise]").dataset.exercise;
-    if (exercises[id]) toast("这是参考课程动作；请在“动作”页打开康复师已发布的跟练课件。");
+    if (exercises[id]) toast("这是参考课程动作；请在“跟练课件”页打开康复师已发布的跟练课件。");
     return;
   }
   if (event.target.closest("[data-timer]")) {
@@ -1245,6 +1287,8 @@ document.addEventListener("click", async (event) => {
     startTimer(Number(button.dataset.timer), button);
     return;
   }
+  const reviewTab = event.target.closest("[data-review-tab]");
+  if (reviewTab) return updateState({ activeView: "review", reviewTab: reviewTab.dataset.reviewTab });
   const pathTab = event.target.closest("[data-path-tab]");
   if (pathTab) return updateState({ pathTab: pathTab.dataset.pathTab });
   const moreTab = event.target.closest("[data-more-tab]");
@@ -1326,7 +1370,9 @@ document.addEventListener("click", async (event) => {
     updateState({ started: false, onboardingStep: 2, recommendation: null });
   }
   if (action === "redo-safety") updateState({ started: false, onboardingStep: 1, safetyStatus: "unchecked", safetyFlags: [] });
-  if (action === "start-session") openPrecheck();
+  if (action === "start-session") { if (state.trainingPaused || hasSafetyBlock(state)) return toast("训练已暂停，请查看安全帮助。", "error"); if (sessionDraft) openSessionPlayer(); else openPrecheck(); }
+  if (action === "resume-session" && sessionDraft && !state.trainingPaused && !hasSafetyBlock(state)) openSessionPlayer();
+  if (action === "pause-session") { closeModal(); render(); }
   if (action === "confirm-precheck") {
     if (document.querySelector("#newWarning")?.checked) {
       closeModal();
@@ -1413,7 +1459,9 @@ document.addEventListener("submit", (event) => {
 document.addEventListener("change", async (event) => {
   if (event.target.matches("[data-player-check]")) {
     const checks = [...document.querySelectorAll("[data-player-check]")];
-    const done = checks.filter((item) => item.checked).length;
+    sessionDraft.checked = checks.map((item,index) => item.checked ? index : -1).filter(index => index >= 0);
+    persistSessionDraft();
+    const done = sessionDraft.checked.length;
     const progress = document.querySelector("#sessionProgress");
     if (progress) progress.textContent = `${done}/${checks.length}`;
     event.target.closest(".player-item")?.classList.toggle("done", event.target.checked);
@@ -1445,6 +1493,11 @@ document.addEventListener("change", async (event) => {
 });
 
 document.addEventListener("input", (event) => {
+  if (event.target.matches("#checkinForm input, #checkinForm textarea, .session-modal input")) {
+    const input = event.target;
+    if (input.type === "radio") document.querySelectorAll(`input[name="${input.name}"]`).forEach(el => formDrafts[`${el.name}:${el.value}`] = el.checked);
+    else formDrafts[input.id || `${input.name}:${input.value}`] = input.type === "checkbox" ? input.checked : input.value;
+  }
   if (event.target.id === "librarySearch") {
     state.librarySearch = event.target.value.slice(0, 60);
     saveState();

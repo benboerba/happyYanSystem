@@ -96,17 +96,20 @@ assert.match(appElement.innerHTML, /康复师自定义动作/);
 assert.match(appElement.innerHTML, /屈曲不耐受/);
 vm.runInContext(`state = sanitizeState({ ...state, doseMode: "minimum" }); render();`, context);
 assert.match(appElement.innerHTML, /最低有效日/);
-assert.match(appElement.innerHTML, /自我管理徽章 · 不解锁阶段/);
+assert.doesNotMatch(appElement.innerHTML, /自我管理徽章 · 不解锁阶段/);
+assert.match(vm.runInContext("renderDailyPractice()", context), /自我管理徽章 · 不解锁阶段/);
 
 const yesterday = vm.runInContext(`todayKey(new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate() - 1))`, context);
 const today = vm.runInContext(`todayKey()`, context);
 vm.runInContext(`state = sanitizeState({ ...initialState, started: true, safetyStatus: "clear", sessions: [{ id: "past", date: ${JSON.stringify(yesterday)}, stageId: "life" }], checkins: [] })`, context);
 assert.equal(vm.runInContext(`pendingReviewSession()?.date`, context), yesterday, "次日应出现既往训练待复盘");
+assert.match(vm.runInContext("renderToday()", context), /记录训练后反应/);
 vm.runInContext(`state = sanitizeState({ ...state, checkins: [{ id: "review", date: ${JSON.stringify(today)}, reviewedSessionDate: ${JSON.stringify(yesterday)}, reviewKey: "session:${yesterday}" }] })`, context);
 assert.equal(vm.runInContext(`pendingReviewSession()`, context), null, "关联反馈后提醒应消除");
 vm.runInContext(`state = sanitizeState({ ...initialState, started: true, safetyStatus: "clear", sessions: [{ id: "today", date: ${JSON.stringify(today)}, stageId: "life" }], checkins: [] })`, context);
 assert.equal(vm.runInContext(`pendingReviewSession()`, context), null, "当天训练不应立即冒充次日待办");
 assert.equal(vm.runInContext(`hasTodaySession()`, context), true, "当天训练应显示等待次日状态");
+assert.match(vm.runInContext("renderToday()", context), /今日训练已记录/);
 vm.runInContext(`state = sanitizeState({ ...initialState, safetyStatus: "clear", sessions: [{ id: "year-boundary", date: "2026-12-31", stageId: "life" }], checkins: [] })`, context);
 assert.equal(vm.runInContext(`pendingReviewSession("2027-01-01")?.date`, context), "2026-12-31", "本地日期跨月跨年仍应识别次日待办");
 
