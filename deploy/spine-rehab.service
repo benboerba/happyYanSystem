@@ -1,0 +1,24 @@
+[Unit]
+Description=Fuji spine rehabilitation courseware app
+After=network.target
+
+[Service]
+Type=simple
+User=spine-rehab
+Group=spine-rehab
+WorkingDirectory=/opt/spine-rehab/current
+Environment=NODE_ENV=production
+Environment=PORT=5317
+Environment=DATA_DIR=/var/lib/spine-rehab/server-data
+Environment=UPLOADS_DIR=/var/lib/spine-rehab/uploads
+ExecStart=/usr/local/bin/node server.mjs
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/spine-rehab
+
+[Install]
+WantedBy=multi-user.target

@@ -5,8 +5,8 @@ import { extname, join, normalize, resolve } from "node:path";
 import { randomUUID } from "node:crypto";
 
 const root = resolve(import.meta.dirname);
-const dataDir = join(root, "server-data");
-const uploadsDir = join(root, "uploads");
+const dataDir = resolve(process.env.DATA_DIR || join(root, "server-data"));
+const uploadsDir = resolve(process.env.UPLOADS_DIR || join(root, "uploads"));
 const dataFile = join(dataDir, "courseware.json");
 const port = Number(process.env.PORT || 5173);
 const maxUploadBytes = 300 * 1024 * 1024;
