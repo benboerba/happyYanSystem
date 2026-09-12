@@ -3647,3 +3647,44 @@ select,textarea,input[type="text"],input[type="number"],input[type="url"],input[
   .art-caption { bottom: 24px; left: 20px; }
   .art-caption strong { font-size: 54px; }
 }
+
+/* Full-page courseware mirrors the therapist focus preview. */
+.modal-backdrop.teaching-layer { padding:0; background:var(--paper); overflow:hidden; }
+.teaching-layer .courseware-modal {
+  width:100%; max-width:none; height:100dvh; max-height:none; margin:0;
+  padding:24px clamp(20px,4vw,64px); border-radius:0; box-shadow:none;
+  display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+  grid-template-rows:auto minmax(240px,1fr) minmax(130px,.45fr) auto;
+  gap:18px 24px; overflow:auto;
+}
+.courseware-modal .courseware-back { position:static; grid-column:1 / -1; width:auto; height:42px; justify-self:start; padding:0 16px; border-radius:12px; font:700 14px var(--sans); background:#eee8ff; color:#6544ce; }
+.teaching-layer .courseware-modal { grid-template-rows:42px auto minmax(240px,1fr) minmax(110px,.4fr) auto; }
+.teaching-layer .courseware-modal > header { grid-column:1 / -1; padding:0 0 14px; }
+.teaching-layer .courseware-modal > header h2 { font-size:clamp(26px,3vw,38px); padding:0; margin:6px 0 0; }
+.teaching-layer .courseware-modal > header p { margin:0; }
+.teaching-layer .courseware-modal > section { min-width:0; min-height:0; padding:0; border:0; display:flex; flex-direction:column; }
+.teaching-layer .courseware-modal > section:nth-of-type(3) { grid-column:1 / -1; }
+.teaching-layer .courseware-title { flex:none; margin-bottom:10px; }
+.teaching-layer .courseware-title h3 { font-size:18px; }
+.teaching-layer .teaching-media { flex:1; min-height:0; margin:0; border-radius:20px; overflow:hidden; background:#211f29; }
+.teaching-layer .video-frame { height:100%; aspect-ratio:auto; }
+.teaching-layer .video-frame video, .teaching-layer .video-frame iframe { width:100%; height:100%; max-height:none; object-fit:contain; }
+.teaching-layer .courseware-images { flex:1; min-height:0; padding:10px; overflow:auto; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); align-content:start; }
+.teaching-layer .courseware-images figure { min-width:0; }
+.teaching-layer .courseware-images img { width:100%; height:clamp(160px,30vh,360px); object-fit:contain; }
+.teaching-layer .courseware-tips { flex:1; min-height:0; overflow:auto; padding:14px 22px; border-radius:20px; background:linear-gradient(135deg,#eefcf7,#f2edff); }
+.teaching-layer .courseware-tips ol { margin:0; }
+.teaching-layer .modal-safety { grid-column:1 / -1; margin:0; font-size:12px; }
+.player-item { grid-template-columns:22px 42px 1fr auto; }
+.player-item.done { opacity:1; }
+.player-item > button[data-courseware] { width:auto; min-height:46px; height:auto; padding:12px 18px; border:0; border-radius:12px; background:#b7f5df; color:#183b30; font-weight:750; }
+@media(max-width:760px) {
+  .teaching-layer .courseware-modal { display:flex; flex-direction:column; height:100dvh; padding:16px; gap:20px; }
+  .courseware-modal .courseware-back { flex:none; align-self:flex-start; }
+  .teaching-layer .courseware-modal > header, .teaching-layer .courseware-modal > section { flex:none; }
+  .teaching-layer .teaching-media { flex:none; height:auto; aspect-ratio:16 / 9; }
+  .teaching-layer .courseware-images { flex:none; overflow:visible; grid-template-columns:1fr; }
+  .teaching-layer .courseware-images img { height:auto; max-height:70vh; }
+  .teaching-layer .courseware-tips { overflow:visible; }
+  .player-item > button[data-courseware] { grid-column:2 / -1; justify-self:start; }
+}

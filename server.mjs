@@ -127,13 +127,37 @@ async function handleAPI(req, res, url) {
 
 async function serveStatic(req, res, url) {
   const requested = url.pathname === "/" ? "/index.html" : url.pathname === "/admin" ? "/admin.html" : url.pathname;
-  const filepath = normalize(join(root, decodeURIComponent(requested)));
-  if (!filepath.startsWith(`${root}/`)) return sendJSON(res, 403, { error: "禁止访问" });
+  const isUpload = requested.startsWith("/uploads/");
+  const base = isUpload ? uploadsDir : root;
+  const relativePath = isUpload ? requested.slice("/uploads/".length) : requested;
+  const filepath = normalize(join(base, decodeURIComponent(relativePath)));
+  if (!filepath.startsWith(`${base}/`)) return sendJSON(res, 403, { error: "禁止访问" });
   let info;
   try { info = await stat(filepath); } catch { return sendJSON(res, 404, { error: "页面不存在" }); }
   if (!info.isFile()) return sendJSON(res, 404, { error: "页面不存在" });
-  res.writeHead(200, { "content-type": mimeTypes[extname(filepath).toLowerCase()] || "application/octet-stream", "content-length": info.size, "cache-control": requested.startsWith("/uploads/") ? "public, max-age=31536000, immutable" : "no-cache" });
-  createReadStream(filepath).pipe(res);
+  const headers = { "content-type": mimeTypes[extname(filepath).toLowerCase()] || "application/octet-stream", "content-length": info.size, "cache-control": isUpload ? "public, max-age=31536000, immutable" : "no-cache", "accept-ranges": "bytes" };
+  let start = 0;
+  let end = info.size - 1;
+  const range = req.method === "GET" && req.headers.range;
+  if (range) {
+    const match = /^bytes=(\d*)-(\d*)$/.exec(range);
+    if (match && (match[1] || match[2])) {
+      start = match[1] ? Number(match[1]) : Math.max(0, info.size - Number(match[2]));
+      end = match[1] && match[2] ? Math.min(Number(match[2]), end) : end;
+    } else start = NaN;
+    if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start > end || start >= info.size) {
+      res.writeHead(416, { "content-range": `bytes */${info.size}` });
+      return res.end();
+    }
+    headers["content-range"] = `bytes ${start}-${end}/${info.size}`;
+    headers["content-length"] = end - start + 1;
+  }
+  res.writeHead(range ? 206 : 200, headers);
+  if (req.method === "HEAD") return res.end();
+  const stream = createReadStream(filepath, range ? { start, end } : undefined);
+  stream.on("error", () => res.destroy());
+  res.on("close", () => stream.destroy());
+  stream.pipe(res);
 }
 
 const server = createServer(async (req, res) => {
