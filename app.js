@@ -5,6 +5,10 @@ const { weeks, cycles, exercises } = window.REHAB_DATA;
 const { stages, exerciseDetails, scenarios, knowledge, safetyQuestions, sources } = window.APP_CONTENT;
 const PUBLIC_MEDIA = window.FUJI_PUBLIC_MEDIA && typeof window.FUJI_PUBLIC_MEDIA === "object" ? window.FUJI_PUBLIC_MEDIA : {};
 const TRAINING_RESET_KEY = "fuji_training_content_reset_20260911";
+const appScriptSource = document.currentScript?.src || "";
+const deploymentBasePath = appScriptSource ? new URL(appScriptSource, location.href).pathname.replace(/\/app\.js$/, "") : "";
+const appPath = (path) => `${deploymentBasePath}${path.startsWith("/") ? path : `/${path}`}`;
+const contentPath = (path) => String(path || "").startsWith("/uploads/") ? appPath(path) : path;
 
 const initialState = {
   version: APP_VERSION,
@@ -371,7 +375,7 @@ function publishedPlanFor() {
 
 async function loadPublishedCourseware() {
   try {
-    const response = await fetch("/api/courseware", { cache: "no-store" });
+    const response = await fetch(appPath("/api/courseware"), { cache: "no-store" });
     if (!response.ok) throw new Error("课件服务不可用");
     const payload = await response.json();
     publishedCourseware = Array.isArray(payload.items) ? payload.items.filter((item) => item?.id && item?.actionName && categoryLabels[item.category]) : [];
@@ -756,7 +760,7 @@ function renderLibrary() {
   return `
     <section class="library-head reveal"><div><p class="eyebrow">康复师发布内容</p><h2>跟练课件</h2><p>课件按屈曲、伸展和压缩不耐受三种触发模式整理。这些是康复师选择的教学标签，不是医学诊断。</p></div></section>
     <div class="library-tools reveal"><label><span>搜索</span><input type="search" id="librarySearch" value="${escapeHTML(state.librarySearch)}" placeholder="动作名或注意要领" /></label><div>${filters.map(([id, label]) => `<button data-library-filter="${id}" class="${state.libraryFilter === id ? "active" : ""}">${label}</button>`).join("")}</div></div>
-    <section class="exercise-grid reveal delay">${entries.map((item) => `<button class="exercise-card courseware-card" data-courseware="${item.id}"><div class="courseware-card-cover">${item.imageUrls?.[0] ? `<img src="${escapeHTML(item.imageUrls[0])}" alt="${escapeHTML(item.actionName)}">` : `<span>PLAY</span>`}</div><span><small>${categoryLabels[item.category]}</small><strong>${escapeHTML(item.actionName)}</strong><p>${escapeHTML(String(item.tips || "").split("\n").find(Boolean) || "查看完整跟练课件")}</p><em>跟练视频 · 动作拆解 · 注意要领</em></span></button>`).join("") || `<div class="empty-state"><span>＋</span><p>${query ? "没有匹配的已发布课件。" : "康复师尚未发布跟练课件。"}</p></div>`}</section>`;
+    <section class="exercise-grid reveal delay">${entries.map((item) => `<button class="exercise-card courseware-card" data-courseware="${item.id}"><div class="courseware-card-cover">${item.imageUrls?.[0] ? `<img src="${escapeHTML(contentPath(item.imageUrls[0]))}" alt="${escapeHTML(item.actionName)}">` : `<span>PLAY</span>`}</div><span><small>${categoryLabels[item.category]}</small><strong>${escapeHTML(item.actionName)}</strong><p>${escapeHTML(String(item.tips || "").split("\n").find(Boolean) || "查看完整跟练课件")}</p><em>跟练视频 · 动作拆解 · 注意要领</em></span></button>`).join("") || `<div class="empty-state"><span>＋</span><p>${query ? "没有匹配的已发布课件。" : "康复师尚未发布跟练课件。"}</p></div>`}</section>`;
 }
 
 function renderReview() {
@@ -860,12 +864,12 @@ async function openExerciseModal(id) {
   const preserveSession = Boolean(sessionDraft && document.querySelector(".session-player"));
   if (preserveSession) stopTimer(); else closeModal();
   const tips = String(courseware.tips || "").split("\n").map((line) => line.replace(/^[\s•·\-*\d.]+/, "").trim()).filter(Boolean);
-  const mediaHTML = courseware.videoUrl ? MediaStore.renderVideo(courseware.videoUrl, `${courseware.actionName}跟练视频`) : `<div class="courseware-missing">康复师未上传视频</div>`;
+  const mediaHTML = courseware.videoUrl ? MediaStore.renderVideo(contentPath(courseware.videoUrl), `${courseware.actionName}跟练视频`) : `<div class="courseware-missing">康复师未上传视频</div>`;
   insertModal(`
     <section class="modal-sheet courseware-modal" role="dialog" aria-modal="true" aria-labelledby="exerciseTitle"><button class="modal-close" data-action="close-teaching" aria-label="${preserveSession ? "返回跟练" : "关闭"}">×</button>
       <header><p class="eyebrow">${categoryLabels[courseware.category]} · 康复师跟练课件</p><h2 id="exerciseTitle">${escapeHTML(courseware.actionName)}</h2></header>
       <section><div class="courseware-title"><b>01</b><h3>跟练视频</h3></div><div class="teaching-media">${mediaHTML}</div></section>
-      <section><div class="courseware-title"><b>02</b><h3>跟练动作拆解（图片）</h3></div><div class="courseware-images">${courseware.imageUrls?.length ? courseware.imageUrls.map((url, index) => `<figure><img src="${escapeHTML(url)}" alt="${escapeHTML(courseware.actionName)}动作拆解 ${index + 1}" loading="lazy"><figcaption>${String(index + 1).padStart(2, "0")}</figcaption></figure>`).join("") : `<div class="courseware-missing">康复师未上传动作拆解图</div>`}</div></section>
+      <section><div class="courseware-title"><b>02</b><h3>跟练动作拆解（图片）</h3></div><div class="courseware-images">${courseware.imageUrls?.length ? courseware.imageUrls.map((url, index) => `<figure><img src="${escapeHTML(contentPath(url))}" alt="${escapeHTML(courseware.actionName)}动作拆解 ${index + 1}" loading="lazy"><figcaption>${String(index + 1).padStart(2, "0")}</figcaption></figure>`).join("") : `<div class="courseware-missing">康复师未上传动作拆解图</div>`}</div></section>
       <section><div class="courseware-title"><b>03</b><h3>注意要领（文字）</h3></div><div class="courseware-tips">${tips.length ? `<ol>${tips.map((tip) => `<li>${escapeHTML(tip)}</li>`).join("")}</ol>` : `<p>康复师未填写注意要领。</p>`}</div></section>
       <p class="modal-safety">若动作引起新的腿部放射、麻木、无力或其他警讯，请立即停止并按安全路径处理。</p>
     </section>`, "teaching-layer", { replace: false });

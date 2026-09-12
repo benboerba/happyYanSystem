@@ -64,7 +64,8 @@ assert.ok(!expectedScripts.some((script) => standalone.includes(`src="./${script
 assert.ok(!standalone.includes('href="./styles.css"'), "单文件仍依赖外部样式");
 
 const appSource = await readFile(join(root, "app.js"), "utf8");
-assert.match(appSource, /fetch\("\/api\/courseware"/, "用户端应从发布接口读取课件");
+assert.match(appSource, /fetch\(appPath\("\/api\/courseware"\)/, "用户端应从当前部署路径的发布接口读取课件");
+assert.match(appSource, /deploymentBasePath[\s\S]*contentPath/, "用户端应适配独立子路径和上传媒体地址");
 assert.match(appSource, /跟练视频[\s\S]*跟练动作拆解（图片）[\s\S]*注意要领（文字）/, "课件预览应保留三个固定模块");
 assert.match(appSource, /publishedPlanFor/, "今日跟练只能显示已发布课件");
 assert.match(appSource, /event\.key === "Escape"\) closeTopModal\(\)/, "Escape 应只关闭最上层教学弹窗");
@@ -84,6 +85,7 @@ assert.match(admin, /用户大预览/);
 assert.match(admin, /admin-theme\.css/, "康复师后台应加载独立视觉主题");
 assert.match(admin, /focusPreview/, "康复师后台应提供专注预览入口");
 assert.match(admin, /进入专注预览/, "专注预览按钮应有明确文案");
+assert.match(admin, /href="\.\/"/, "康复师后台返回用户端时应保留部署子路径");
 assert.match(admin, /发布并对用户生效/);
 assert.match(admin, /屈曲不耐受/);
 assert.match(admin, /伸展不耐受/);
