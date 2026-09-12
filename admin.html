@@ -40,6 +40,7 @@
       </section>
       <label class="field tips-field"><span>03&nbsp;&nbsp; 注意要领（文字）</span><textarea id="tipsInput" rows="8" maxlength="8000" placeholder="一行一条，例如：\n• 保持呼吸，不要屏气\n• 出现腿部放射症状时立即停止"></textarea></label>
       <div class="editor-actions"><button id="saveDraft" class="secondary">保存草稿</button><button id="publish" class="primary">发布并对用户生效</button></div>
+      <div id="saveProgress" class="save-progress" role="status" aria-live="polite" hidden><p id="saveProgressText"></p><progress id="saveProgressBar" max="100" value="0" aria-label="当前文件上传进度"></progress></div>
       <button id="remove" class="remove">清空这个动作的课件</button>
       <p class="hint">发布不会修改用户的训练、复盘或安全记录。</p>
     </aside>

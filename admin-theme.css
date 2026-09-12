@@ -219,3 +219,11 @@ body.preview-mode .course-preview>section:nth-of-type(1) .video-preview { width:
   .editor-panel { padding:26px; }
   .course-preview { padding-left:42px; padding-right:42px; }
 }
+
+.save-progress { margin-top: 14px; padding: 12px 14px; border-radius: 12px; background: #f0faf7; color: #17664f; font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+.save-progress[hidden] { display: none; }
+.save-progress p { margin: 0; }
+.save-progress progress { display: block; width: 100%; height: 8px; margin-top: 9px; accent-color: #7856ea; }
+.save-progress progress[hidden] { display: none; }
+.save-progress.error { background: #fff1f3; color: #a53853; }
+.editor-panel :disabled { cursor: wait; opacity: .6; }
