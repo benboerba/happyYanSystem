@@ -1,0 +1,17 @@
+{
+  "name": "复脊｜腰背恢复教育",
+  "short_name": "复脊",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f3efe7",
+  "theme_color": "#21342d",
+  "description": "以安全筛查、当前能力与延迟反应驱动的腰背恢复教育和记录工具。",
+  "icons": [
+    {
+      "src": "./app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

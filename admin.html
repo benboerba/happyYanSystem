@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>复脊｜康复师课件后台</title>
+  <link rel="icon" href="./app-icon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="./admin.css" />
+  <link rel="stylesheet" href="./admin-theme.css" />
+</head>
+<body>
+  <header class="admin-topbar">
+    <a href="/" class="brand"><span>脊</span><strong>复脊·康复师后台</strong></a>
+    <div><span id="saveState">未发布</span><a href="/" target="_blank">打开用户端 ↗</a></div>
+  </header>
+  <main class="workspace">
+    <aside class="editor-panel">
+      <div class="panel-heading"><small>COURSEWARE</small><h1>跟练课件</h1><p>填写后先在右侧查看大预览，确认后发布。</p></div>
+      <label class="field"><span>选择已有课件 / 新建课件</span><select id="coursewareSelect"><option value="__new__">＋ 新建课件</option></select></label>
+      <label class="field"><span>跟练动作名称</span><input id="actionNameInput" type="text" maxlength="80" placeholder="例如：坐姿骨盆后倾练习" /></label>
+      <label class="field"><span>疼痛触发分类</span><select id="categorySelect"><option value="flexion">屈曲不耐受</option><option value="extension">伸展不耐受</option><option value="compression">压缩不耐受</option></select><small>这是康复师选择的触发模式标签，不是医学诊断。</small></label>
+      <section class="upload-card">
+        <div><b>01</b><span><strong>跟练视频</strong><small>支持 MP4、WebM、MOV，最大 300 MB</small></span></div>
+        <label class="dropzone" id="videoDrop"><input id="videoInput" type="file" accept="video/*" /><span id="videoLabel">点击选择或拖入视频</span></label>
+      </section>
+      <section class="upload-card">
+        <div><b>02</b><span><strong>跟练动作拆解（图片）</strong><small>可上传多张，按选择顺序展示</small></span></div>
+        <label class="dropzone" id="imageDrop"><input id="imageInput" type="file" accept="image/*" multiple /><span id="imageLabel">点击选择或拖入图片</span></label>
+      </section>
+      <label class="field tips-field"><span>03&nbsp;&nbsp; 注意要领（文字）</span><textarea id="tipsInput" rows="8" maxlength="8000" placeholder="一行一条，例如：\n• 保持呼吸，不要屏气\n• 出现腿部放射症状时立即停止"></textarea></label>
+      <div class="editor-actions"><button id="saveDraft" class="secondary">保存草稿</button><button id="publish" class="primary">发布并对用户生效</button></div>
+      <button id="remove" class="remove">清空这个动作的课件</button>
+      <p class="hint">发布不会修改用户的训练、复盘或安全记录。</p>
+    </aside>
+    <section class="preview-panel">
+      <div class="preview-toolbar"><div><small>LIVE PREVIEW</small><strong>用户大预览</strong></div><div class="preview-tools"><span>所见即所得</span><button id="focusPreview" type="button" aria-pressed="false">进入专注预览</button></div></div>
+      <article class="course-preview">
+        <header><p id="previewCategory">屈曲不耐受 · 康复师课件</p><h2 id="previewName">未命名跟练动作</h2><span id="previewStatus">草稿预览</span></header>
+        <section><div class="fixed-title"><b>01</b><h3>跟练视频</h3></div><div class="video-preview" id="videoPreview"><p>上传视频后在这里播放</p></div></section>
+        <section><div class="fixed-title"><b>02</b><h3>跟练动作拆解（图片）</h3></div><div class="image-preview" id="imagePreview"><p>上传图片后在这里大图展示</p></div></section>
+        <section><div class="fixed-title"><b>03</b><h3>注意要领（文字）</h3></div><div class="tips-preview" id="tipsPreview"><p>填写后在这里实时排版</p></div></section>
+      </article>
+    </section>
+  </main>
+  <div id="toast" class="toast" role="status"></div>
+  <script src="./admin.js"></script>
+</body>
+</html>

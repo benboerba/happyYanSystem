@@ -1,0 +1,14 @@
+{
+  "schema": "fuji-public-media",
+  "version": 1,
+  "media": {
+    "breathing": {
+      "type": "url",
+      "url": "./videos/breathing.mp4"
+    },
+    "curlUp": {
+      "type": "local",
+      "name": "must-not-publish.mp4"
+    }
+  }
+}
