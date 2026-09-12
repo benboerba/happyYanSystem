@@ -8,10 +8,21 @@
   <link rel="stylesheet" href="./admin.css" />
   <link rel="stylesheet" href="./admin-theme.css" />
 </head>
-<body>
+<body class="access-locked">
+  <section class="access-gate" id="accessGate" aria-labelledby="accessTitle">
+    <form class="access-card" id="accessForm">
+      <span class="access-mark">脊</span>
+      <small>THERAPIST ACCESS</small>
+      <h1 id="accessTitle">康复师后台</h1>
+      <p>请输入访问码，进入课件编辑与上传。</p>
+      <label><span>访问码</span><input id="accessToken" type="password" inputmode="numeric" autocomplete="one-time-code" required autofocus /></label>
+      <button type="submit" id="accessSubmit">进入后台</button>
+      <p class="access-error" id="accessError" role="alert"></p>
+    </form>
+  </section>
   <header class="admin-topbar">
     <a href="./" class="brand"><span>脊</span><strong>复脊·康复师后台</strong></a>
-    <div><span id="saveState">未发布</span><a href="./" target="_blank">打开用户端 ↗</a></div>
+    <div><span id="saveState">未发布</span><a href="./" target="_blank">打开用户端 ↗</a><button id="lockAdmin" type="button">退出</button></div>
   </header>
   <main class="workspace">
     <aside class="editor-panel">

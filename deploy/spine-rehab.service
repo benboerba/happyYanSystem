@@ -11,6 +11,7 @@ Environment=NODE_ENV=production
 Environment=PORT=5317
 Environment=DATA_DIR=/var/lib/spine-rehab/server-data
 Environment=UPLOADS_DIR=/var/lib/spine-rehab/uploads
+EnvironmentFile=-/etc/spine-rehab.env
 ExecStart=/usr/local/bin/node server.mjs
 Restart=on-failure
 RestartSec=3

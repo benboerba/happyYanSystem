@@ -9,6 +9,7 @@ const dataDir = resolve(process.env.DATA_DIR || join(root, "server-data"));
 const uploadsDir = resolve(process.env.UPLOADS_DIR || join(root, "uploads"));
 const dataFile = join(dataDir, "courseware.json");
 const port = Number(process.env.PORT || 5173);
+const adminToken = String(process.env.ADMIN_TOKEN || "").trim();
 const maxUploadBytes = 300 * 1024 * 1024;
 
 await mkdir(dataDir, { recursive: true });
@@ -86,6 +87,9 @@ async function handleAPI(req, res, url) {
   if (req.method === "GET" && url.pathname === "/api/courseware") {
     const data = await readJSON();
     return sendJSON(res, 200, { items: data.items.filter((item) => item.status === "published") });
+  }
+  if (url.pathname.startsWith("/api/admin/") && (!adminToken || req.headers["x-admin-token"] !== adminToken)) {
+    return sendJSON(res, 401, { error: "访问码不正确" });
   }
   if (req.method === "GET" && url.pathname === "/api/admin/courseware") return sendJSON(res, 200, await readJSON());
 

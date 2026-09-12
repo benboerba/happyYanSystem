@@ -85,6 +85,7 @@ assert.match(admin, /用户大预览/);
 assert.match(admin, /admin-theme\.css/, "康复师后台应加载独立视觉主题");
 assert.match(admin, /focusPreview/, "康复师后台应提供专注预览入口");
 assert.match(admin, /进入专注预览/, "专注预览按钮应有明确文案");
+assert.match(admin, /accessToken/, "康复师后台应提供访问码入口");
 assert.match(admin, /href="\.\/"/, "康复师后台返回用户端时应保留部署子路径");
 assert.match(admin, /发布并对用户生效/);
 assert.match(admin, /屈曲不耐受/);
@@ -97,5 +98,7 @@ assert.match(adminTheme, /\.course-preview[\s\S]*border-radius:30px/, "大预览
 const server = await readFile(join(root, "server.mjs"), "utf8");
 assert.match(server, /GET[^\n]*\/api\/courseware/);
 assert.match(server, /\/api\/admin\/upload/);
+assert.match(server, /ADMIN_TOKEN/, "康复师后台接口应由服务端访问码保护");
+assert.match(server, /x-admin-token/, "康复师后台请求应验证访问码请求头");
 
 console.log(`静态检查通过：${stages.length} 阶段、${weeks.length} 周、${Object.keys(exercises).length} 个动作、${scenarios.length} 个生活情景。`);

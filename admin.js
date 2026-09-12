@@ -10,12 +10,39 @@ const adminScriptSource = document.currentScript?.src || "";
 const deploymentBasePath = adminScriptSource ? new URL(adminScriptSource, location.href).pathname.replace(/\/admin\.js$/, "") : "";
 const appPath = (path) => `${deploymentBasePath}${path.startsWith("/") ? path : `/${path}`}`;
 const contentPath = (path) => String(path || "").startsWith("/uploads/") ? appPath(path) : path;
+const tokenStorageKey = "spineRehabAdminToken";
+let adminToken = sessionStorage.getItem(tokenStorageKey) || "";
 let records = {};
 let currentId = "";
 let draft = { actionName: "", category: "flexion", videoUrl: "", imageUrls: [], tips: "", status: "draft" };
 let objectUrls = [];
 let localVideoUrl = "";
 let localImageUrls = [];
+
+function lockAdmin(message = "") {
+  document.body.classList.add("access-locked");
+  document.querySelector("#accessToken").value = "";
+  document.querySelector("#accessError").textContent = message;
+  requestAnimationFrame(() => document.querySelector("#accessToken").focus());
+}
+
+function unlockAdmin() {
+  document.body.classList.remove("access-locked");
+  document.querySelector("#accessError").textContent = "";
+}
+
+async function adminFetch(path, options = {}) {
+  const response = await fetch(appPath(path), {
+    ...options,
+    headers: { ...(options.headers || {}), "x-admin-token": adminToken }
+  });
+  if (response.status === 401) {
+    sessionStorage.removeItem(tokenStorageKey);
+    adminToken = "";
+    lockAdmin("访问码不正确，请重新输入。");
+  }
+  return response;
+}
 
 function toast(message, error = false) {
   const node = document.querySelector("#toast");
@@ -76,7 +103,7 @@ function loadSelected() {
 }
 
 async function upload(file, kind) {
-  const response = await fetch(appPath(`/api/admin/upload?kind=${kind}`), { method: "POST", headers: { "content-type": file.type, "x-file-name": encodeURIComponent(file.name) }, body: file });
+  const response = await adminFetch(`/api/admin/upload?kind=${kind}`, { method: "POST", headers: { "content-type": file.type, "x-file-name": encodeURIComponent(file.name) }, body: file });
   const result = await response.json();
   if (!response.ok) throw new Error(result.error || "上传失败");
   return result.url;
@@ -96,7 +123,7 @@ async function persist(status) {
     if (!draft.actionName) throw new Error("请先填写跟练动作名称。");
     if (status === "published" && (!draft.videoUrl || !draft.imageUrls.length || !draft.tips)) throw new Error("发布前请完成视频、动作拆解图和注意要领。");
     const id = currentId || newId();
-    const response = await fetch(appPath(`/api/admin/courseware/${id}`), { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(draft) });
+    const response = await adminFetch(`/api/admin/courseware/${id}`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(draft) });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || "保存失败");
     records[id] = result.item;
@@ -133,7 +160,7 @@ document.querySelector("#publish").addEventListener("click", () => persist("publ
 document.querySelector("#remove").addEventListener("click", async () => {
   if (!currentId) return toast("这是尚未保存的新课件。", true);
   if (!confirm(`确认清空“${draft.actionName}”的课件？`)) return;
-  await fetch(appPath(`/api/admin/courseware/${currentId}`), { method: "DELETE" });
+  await adminFetch(`/api/admin/courseware/${currentId}`, { method: "DELETE" });
   delete records[currentId];
   rebuildCoursewareSelect("__new__");
   loadSelected();
@@ -153,8 +180,36 @@ document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && document.body.classList.contains("preview-mode")) setPreviewMode(false);
 });
 
-fetch(appPath("/api/admin/courseware")).then((response) => response.json()).then((data) => {
-  records = Object.fromEntries((data.items || []).map((item) => [item.id, item]));
-  rebuildCoursewareSelect("__new__");
-  loadSelected();
-}).catch(() => toast("无法读取内容库，请从 server.mjs 启动。", true));
+async function enterAdmin(token) {
+  const button = document.querySelector("#accessSubmit");
+  button.disabled = true;
+  button.textContent = "正在验证…";
+  adminToken = token.trim();
+  try {
+    const response = await adminFetch("/api/admin/courseware");
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "无法进入后台");
+    sessionStorage.setItem(tokenStorageKey, adminToken);
+    records = Object.fromEntries((data.items || []).map((item) => [item.id, item]));
+    rebuildCoursewareSelect("__new__");
+    loadSelected();
+    unlockAdmin();
+  } catch (error) {
+    lockAdmin(error.message || "无法进入后台");
+  } finally {
+    button.disabled = false;
+    button.textContent = "进入后台";
+  }
+}
+
+document.querySelector("#accessForm").addEventListener("submit", (event) => {
+  event.preventDefault();
+  enterAdmin(document.querySelector("#accessToken").value);
+});
+document.querySelector("#lockAdmin").addEventListener("click", () => {
+  sessionStorage.removeItem(tokenStorageKey);
+  adminToken = "";
+  lockAdmin();
+});
+
+if (adminToken) enterAdmin(adminToken); else lockAdmin();
